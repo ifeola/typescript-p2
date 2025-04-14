@@ -125,6 +125,140 @@ enum Size {
 	Right = "RIGHT",
 }
 
-
 // Any Type, Unknown Type and Type cast
-// Any type
+// ------------------------------ Any type
+/* 
+What it is: any is TypeScript's "escape hatch." It essentially tells the compiler to turn off type checking for a particular variable.
+
+Behavior:
+    - You can assign any value (string, number, object, etc.) to a variable of type any.
+    - You can assign a value of type any to a variable of almost any other type (this is generally unsafe).
+    - You can access any property or call any method on a variable of type any, even if it doesn't exist at runtime. TypeScript won't complain at compile time.
+
+		Pros:
+    - Useful when migrating existing JavaScript code to TypeScript.
+    - Can be a temporary solution when dealing with complex third-party libraries without proper typings (though this is less common now).
+    - Allows for very dynamic code structures if absolutely necessary.
+
+		Cons:
+    - Completely undermines the benefits of TypeScript. You lose compile-time type safety.
+    - Errors that would be caught at compile time (like typos in property names or incorrect method calls) are deferred until runtime, leading to crashes or unexpected behavior.
+    - Makes code harder to understand and refactor because the compiler provides no guarantees about the shape or behavior of any variables.
+*/
+
+// Example of any type
+let looselyTyped: any;
+
+looselyTyped = 5; // OK
+looselyTyped = "hello"; // OK
+looselyTyped = { id: 1 }; // OK
+
+console.log(looselyTyped.toUpperCase()); // Compiles OK, but will CRASH if looselyTyped is not a string at runtime
+
+let myNum: number;
+myNum = looselyTyped; // Compiles OK (Dangerous!), will cause runtime error if looselyTyped is not a number
+
+looselyTyped.someNonExistentMethod(); // Compiles OK, but CRASHES at runtime
+console.log(looselyTyped.someNonExistentProperty); // Compiles OK, but results in `undefined` at runtime
+
+//     Recommendation: Avoid any whenever possible. Use it only as a last resort.
+
+// ------------------------------ Unknown Type
+/* What it is: unknown is the type-safe counterpart to any. It represents a value whose type is not known at compile time, but unlike any, TypeScript forces you to perform type checks before you can operate on the value.
+
+Behavior:
+    - You can assign any value (string, number, object, etc.) to a variable of type unknown.
+    - You cannot assign a value of type unknown to a variable of any other type (except any or unknown itself) without first narrowing its type (using type guards like typeof, instanceof) or using a type assertion.
+    - You cannot access properties or call methods on a variable of type unknown without first narrowing its type or using a type assertion.
+
+Pros:
+    - Provides type safety for values whose types are genuinely unknown at compile time (e.g., data from APIs, user input, JSON.parse).
+    - Forces developers to handle potential type errors explicitly.
+
+Cons:
+    - Requires extra code (type checks or assertions) to work with the value.
+*/
+
+// Example
+let definitelyNotAny: unknown;
+
+definitelyNotAny = 10; // OK
+definitelyNotAny = "world"; // OK
+definitelyNotAny = { name: "TS" }; // OK
+
+// ---- Errors - Cannot use directly ----
+// console.log(definitelyNotAny.toUpperCase()); // Error: Object is of type 'unknown'.
+// let myStr: string = definitelyNotAny;        // Error: Type 'unknown' is not assignable to type 'string'.
+// definitelyNotAny.someMethod();               // Error: Object is of type 'unknown'.
+
+// ---- Safe usage with type checking ----
+if (typeof definitelyNotAny === "string") {
+	// Inside this block, TS knows definitelyNotAny is a string
+	console.log(definitelyNotAny.toUpperCase()); // OK
+	let myStr: string = definitelyNotAny; // OK
+} else if (typeof definitelyNotAny === "number") {
+	console.log(definitelyNotAny.toFixed(2)); // OK
+} else if (definitelyNotAny instanceof Error) {
+	console.error(definitelyNotAny.message); // OK
+}
+
+/* Recommendation: Prefer unknown over any when dealing with values of uncertain types. It maintains type safety by forcing you to check the type before use. */
+
+// ------------------------------ Type Casting / Type Assertion
+/* 
+What it is: Type Assertion (often called Type Casting in other languages, though the mechanism is slightly different) is a way to tell the TypeScript compiler that you know the type of a variable better than it does. It doesn't perform any special runtime conversion or checking (usually); it's purely a compile-time instruction.
+*/
+// Syntax: There are two syntaxes:
+// 1. as keyword (preferred, especially in .tsx files):
+let someValue: unknown = "this is a string";
+let strLength: number = (someValue as string).length;
+
+// 2. Angle bracket syntax:
+let someOtherValue: unknown = "this is a string";
+let stringLength: number = (<string>someOtherValue).length;
+// (Note: Angle bracket syntax clashes with JSX/TSX syntax, so as is generally recommended.)
+
+/* 
+Purpose:
+    - To use properties or methods on a variable typed as unknown or any when you are certain about its actual runtime type.
+    - To handle types from external sources (like DOM elements) where TypeScript might infer a broader type (e.g., HTMLElement) but you know it's a more specific one (e.g., HTMLInputElement).
+
+Risks:
+    - It's unsafe if you're wrong. If you assert a type that the value doesn't actually have at runtime, your code will likely crash or behave unexpectedly later on. The compiler trusts your assertion and won't prevent runtime errors resulting from incorrect assertions. 
+*/
+
+// Examples
+// Example 1: Working with unknown
+let dataFromApi: unknown = JSON.parse('{ "userId": 1, "title": "Learn TS" }');
+
+// Assuming we KNOW the shape of the data
+interface Todo {
+	userId: number;
+	title: string;
+}
+
+// Assert that dataFromApi is a Todo
+let todoItem = dataFromApi as Todo;
+console.log(todoItem.userId); // OK (if the assertion was correct)
+console.log(todoItem.title); // OK (if the assertion was correct)
+
+// Example 2: Working with the DOM
+// const myInput = document.getElementById("myInput"); // Type is HTMLElement | null
+const myInput = document.getElementById("myInput") as HTMLInputElement | null; // Assert specific type
+
+if (myInput) {
+	console.log(myInput.value); // OK, .value exists on HTMLInputElement
+}
+
+// Example 3: Incorrect Assertion (Leads to Runtime Error)
+let val: unknown = 5;
+// console.log((val as string).toUpperCase()); // Compiles OK, but CRASHES at runtime because 5 is not a string
+
+/* 
+  Recommendation: Use type assertions cautiously. Prefer type guards (typeof, instanceof, custom type guards) when possible, as they perform actual runtime checks. Use assertions only when you are absolutely certain about the type and type guards are impractical or impossible.
+
+In Summary:
+	- any: Opts out of type checking. Avoid it. Unsafe.
+	- unknown: Represents an unknown type safely. Forces type checks or assertions before use. Prefer this over any. Safe.
+	- Type Assertion (as / <>): Tells the compiler "trust me, I know the type." Bypasses compile-time checks for that specific operation. Use with caution, only when you're sure. Can be unsafe if misused.
+*/
