@@ -124,3 +124,7 @@ enum Size {
 	Left = "LEFT",
 	Right = "RIGHT",
 }
+
+
+// Any Type, Unknown Type and Type cast
+// Any type
